@@ -50,15 +50,15 @@ Why example.c Can Call Many Functions
         The linker resolves function calls like gzputc() from libz.a.
 
 
-## Creating Unity Test Harnesses for zlib
+## Creating Unity Test Harnesses for zlib: modification in Makefile
 
 To test individual zlib modules using the Unity testing framework:
 	1.	Create a test file for each module you want to test (e.g., test/test_gzread.c).
 	2.	Add Makefile rules to build and link the test program with zlib and Unity:
 
 Pattern rule for test harnesses
-tests_%: tests_%.o $(STATICLIB) unity.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(STATICLIB) unity.o
+tests_%: tests_%.o $(STATICLIB) unity/unity.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(STATICLIB) unity/unity.o
 
 Build the object for a test harness in test/
 tests_%.o: $(SRCDIR)test/tests_%.c $(SRCDIR)zlib.h zconf.h
@@ -82,7 +82,9 @@ Not the ones in /examples. those are programs that demonstrate how to use zlib. 
 We do it per function.
 But problem: most functions in the source code is declared local via the ZLIB_INTERNAL attribute, making it invisible outside its compilation unit and therefore unavailable to our test harness. 
 
-To address this, we created a small wrapper function, test_gz_avail, that simply calls gz_avail and is globally visible. We then modified our test code to call test_gz_avail instead of gz_avail.
+To address this, we created a global wrapper function. see `data_pipelie/test_addglobalwrapper.py`
+
+eg. we create test_gz_avail, that simply calls gz_avail and is globally visible. We then modified our test code to call test_gz_avail instead of gz_avail.
 ```c
 int test_gz_avail(gz_statep state) { return gz_avail(state); }
 ```
@@ -91,4 +93,19 @@ TO see that its global scope:
 nm libz.a | grep gz_avail
 0000000000000090 t gz_avail
 0000000000000910 T test_gz_avail
+```
+
+## MUll:
+# Mull mutation testing:
+```bash
+make clean
+export CFLAGS="-fpass-plugin=/usr/lib/mull-ir-frontend-14 -g -grecord-command-line -fprofile-instr-generate -fcoverage-mapping"
+CC=clang-14 C_INCLUDE_PATH="/zlib:/zlib/tests:/zlib/unity" ./configure
+```
+
+example:
+```bash
+make tests_gzread_gzclose_r
+./tests_gzread_gzclose_r
+mull-runner-14 tests_gzread_gzclose_r --debug >> mull_gzclose.out 2>&1
 ```

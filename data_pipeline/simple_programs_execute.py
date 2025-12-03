@@ -1,5 +1,4 @@
-
-from test_gpt5_generation import generate_tests_for_one_zlib_file
+from test_container_one_mull import run_build_execute_mutate_for_one_zlib_program
 
 default_progs = [
     "adler32",
@@ -22,14 +21,14 @@ default_progs = [
 if __name__ == "__main__":
     success = 0
     failed = 0
-    print(len(default_progs), " files to generate tests for.")
+    print(len(default_progs), " files to execute tests for.")
     for i, program_name in enumerate(default_progs, 1):
         print(f"\n{'='*70}")
-        print(f"Generating tests for zlib files: {program_name}")
+        print(f"Executing tests for zlib files: {program_name}")
         print(f"[{i}/{len(default_progs)}] {program_name}")
         print('='*70)
         try:
-            generate_tests_for_one_zlib_file(program_name)
+            run_build_execute_mutate_for_one_zlib_program(program_name, enable_mutation_testing=True)
             success += 1
             print(f"✓ {program_name} DONE")
         except Exception as e:

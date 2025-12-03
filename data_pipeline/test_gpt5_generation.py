@@ -92,14 +92,14 @@ class FunctionToUnityTests(dspy.Signature):
     Your task is to write a standalone test suite (tests_{module_name}_{function_name}.c) that thoroughly tests ONLY this specific function, using the Unity Testing Framework.
 
     CONTEXT:
-    The function given to you is declared local in the source code, so a global wrapper function named test_{function_name} has been added.
-    You should call the global wrapper test_{function_name} instead of the original local function.
+    You should call the function directly without redefining it in the test file.
+    In the case where the function given to you is declared local in the source code, I have added a global wrapper function named test_{function_name} in the source code for you to call instead. You should call the global wrapper test_{function_name} instead of the original local function.
     Do not redefine internal structs, functions, or macros from the zlib source — this can cause compilation errors or runtime issues. Use the existing definitions. 
 
     REQUIRED FORMAT for `tests_{module_name}_{function_name}.c`: A Unity test file that thoroughly tests the given function's functionality.
     - At the top of the file, add 
         ```c
-        #include "unity.h"
+        #include "unity/unity.h"
         #include "zlib.h"
         ```
         Also include any other standard headers needed for the test code itself (e.g., stdlib.h, string.h, math.h).
@@ -195,6 +195,77 @@ def generate_unity_tests_with_llm(converter, module_name, module_code, target_fu
     except Exception as e:
         print(f"  ✗ Error generating tests with LLM for {target_function_name}: {e}")
         return False
+    
+
+#for functions that are local, we need to create a global wrapper function for the tests code to call
+
+def create_global_wrapper_functions(original_code, function_signature):
+    """
+    For a given function, if its signature contains 'local',
+    generate a global wrapper and append it after the original function's full code.
+
+    local int gz_skip(gz_statep state, z_off64_t len)
+    -->
+    int test_gz_skip(gz_statep state, z_off64_t len) {
+        return gz_skip(state, len);
+    }
+
+    if it's not local, return the original code unchanged.
+    """
+
+    # Convert `function_signature` into a matching regex
+    # e.g. "local int gz_skip(gz_statep state, z_off64_t len)"
+    sig_regex = (
+        r'\b' +
+        re.escape("local") + r'\s+' +
+        r'([^\(\)]+?)\s+' +                  # return type
+        r'(' + re.escape(function_signature.split()[2].split("(")[0]) + r')\s*' +
+        r'\(([^)]*)\)'                       # parameters
+    )
+    pattern = re.compile(sig_regex, re.MULTILINE)
+
+    match = pattern.search(original_code)
+    if not match:
+        print("No local function match found for signature:", function_signature)
+        return original_code  # not a local function → no wrapper
+
+    ret_type = match.group(1).strip()
+    name = match.group(2).strip()
+    params = match.group(3).strip()
+
+    # Extract argument names for the call
+    if not params.strip():
+        call_args = ""
+    else:
+        call_args = ", ".join(p.split()[-1] for p in params.split(","))
+
+    # ---- Find the FULL function body ----
+    sig_end = match.end()
+    body_start = original_code.find("{", sig_end)
+    if body_start == -1:
+        return original_code
+
+    # Match braces to find end of function
+    brace_count = 1
+    i = body_start + 1
+    while i < len(original_code) and brace_count > 0:
+        if original_code[i] == "{":
+            brace_count += 1
+        elif original_code[i] == "}":
+            brace_count -= 1
+        i += 1
+    body_end = i  # index after closing }
+
+    # ---- Build wrapper ----
+    wrapper = (
+        f"\n{ret_type} test_{name}({params}) {{\n"
+        f"    return {name}({call_args});\n"
+        f"}}\n\n"
+    )
+
+    # ---- Insert wrapper after full function ----
+    modified = original_code[:body_end] + wrapper + original_code[body_end:]
+    return modified
 
 def generate_tests_for_one_zlib_file(module_name):
     C_LANGUAGE = Language(tsc.language())
@@ -213,6 +284,7 @@ def generate_tests_for_one_zlib_file(module_name):
         os.makedirs(tests_dir_path, exist_ok=True)
         print(f"Required tests directory does not exist: {tests_dir_path}. Making the directory.")
     
+    os.makedirs(INJECTABLE_FUNCTION_PATH, exist_ok=True)
     injectable_json_path = os.path.join(INJECTABLE_FUNCTION_PATH, f"{module_name}_injectable_functions.json")
 
     with open(src_c_path, 'r') as f:
@@ -229,23 +301,22 @@ def generate_tests_for_one_zlib_file(module_name):
         function_name = func['name']
         function_name_clean = re.sub(r'[^0-9a-zA-Z_]', '_', function_name)
         function_signature = func['signature']
-        # print(f"\n[{i}/{len(function_info)}] Processing function: {function_name}")
-        
-        injectable_functions.append({
-            "function_name": function_name,
-            "function_signature": function_signature,
-        })
+        print(f"\n[{i}/{len(function_info)}] Processing function: {function_name}")
+
+        #call the helper function to check if the function is local and create a global wrapper if needed
+        global_included_code = create_global_wrapper_functions(original_code, function_signature)
         
         # Reuse the same converter for all functions
         tests_c_result = generate_unity_tests_with_llm(
             converter,
             module_name, 
-            original_code, 
+            global_included_code, 
             function_signature
         )
 
         # Write test file for this function
-        tests_c_per_function_path = os.path.join(tests_dir_path, f"tests_{module_name}_{function_name_clean}.c")
+        test_filename = f"tests_{module_name}_{function_name_clean}.c"
+        tests_c_per_function_path = os.path.join(tests_dir_path, test_filename)
         if tests_c_result:
             print(f"  ✓ Writing generated tests to {tests_c_per_function_path}")
             with open(tests_c_per_function_path, "w") as f:
@@ -253,10 +324,20 @@ def generate_tests_for_one_zlib_file(module_name):
         else:
             print(f"  ✗ Failed to generate tests for function: {function_name}")
 
+        injectable_functions.append({
+            "function_name": function_name,
+            "function_signature": function_signature,
+            "test_filename": test_filename if tests_c_result else None
+        })
+
+        # Write JSON after each function (real-time)
+        with open(injectable_json_path, "w") as f:
+            json.dump(injectable_functions, f, indent=2)
+
     # Save injectable functions metadata
     # print(f"\n  Writing injectable functions metadata to {injectable_json_path}")
-    with open(injectable_json_path, "w") as f:
-        json.dump(injectable_functions, f, indent=2)
+    # with open(injectable_json_path, "w") as f:
+    #     json.dump(injectable_functions, f, indent=2)
 
     # print("\n" + "="*60)
     # print("COMPLETE")

@@ -1,0 +1,15 @@
+program_name,function_name,build,test,mull_score,mull_total,mull_killed,mull_survived
+gzread,gz_load,True,False,N/A,0,0,0
+gzread,gz_avail,False,False,N/A,0,0,0
+gzread,gz_look,True,True,58,60,35,25
+gzread,gz_decomp,True,False,N/A,0,0,0
+gzread,gz_fetch,False,False,N/A,0,0,0
+gzread,gz_skip,True,False,N/A,0,0,0
+gzread,gz_read,True,True,64,117,75,42
+gzread,gzread,True,True,64,113,73,40
+gzread,gzfread,True,False,N/A,0,0,0
+gzread,gzgetc,False,False,N/A,0,0,0
+gzread,gzungetc,True,True,54,105,57,48
+gzread,gzdirect,True,True,56,106,60,46
+gzread,gzclose_r,True,True,71,106,76,30
+gzread,13,10,6,61.166666666666664,46.69230769230769

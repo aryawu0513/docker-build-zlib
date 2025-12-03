@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:22.04
 
 RUN apt update -y \
     && apt install --no-install-recommends -y \
@@ -45,7 +45,7 @@ RUN ./configure --prefix=/usr && \
 # -------------------------
 # Setup Unity
 # -------------------------
-WORKDIR /unity
+WORKDIR /zlib/unity
 RUN curl -LO https://raw.githubusercontent.com/ThrowTheSwitch/Unity/refs/heads/master/src/unity.c \
     && curl -LO https://raw.githubusercontent.com/ThrowTheSwitch/Unity/refs/heads/master/src/unity.h \
     && curl -LO https://raw.githubusercontent.com/ThrowTheSwitch/Unity/refs/heads/master/src/unity_internals.h
@@ -57,14 +57,15 @@ RUN echo "__attribute__((weak)) void tearDown(void) {}\n" >> unity.c
 # Compile Unity object
 RUN gcc -c -fPIC -o unity.o unity.c -I.
 
-# Copy Unity headers into zlib source dir so Makefile can find them
-RUN cp unity.h unity_internals.h /zlib/
+# Patch zlib Makefile for tests
+COPY patch_makefile.py /zlib/
+WORKDIR /zlib
+RUN python3 patch_makefile.py
 
-# -------------------------
-# Trick: allow make to automatically link Unity in tests
-# -------------------------
-# Zlib's Makefile does not know Unity, so we create a dummy Makefile variable
-# and inject unity.o into the link step
+# Install Mull 14 (for LLVM 14)
+RUN wget https://github.com/mull-project/mull/releases/download/0.26.1/Mull-14-0.26.1-LLVM-14.0-ubuntu-x86_64-22.04.deb -O /tmp/mull.deb && \
+    apt-get install -y /tmp/mull.deb && rm /tmp/mull.deb
+
 WORKDIR /zlib
 RUN make -j$(nproc) check
 # -------------------------
