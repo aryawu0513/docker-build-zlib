@@ -6,6 +6,6 @@
 ```python simple_programs_execute.py```
 
 # Filter result
-Total functions: 110
-Functions with mull_score > 0: 59
-Functions with mull_score > 50: 39
+Total functions: 109
+Functions with mull_score > 0: 58
+Functions with mull_score > 50: 38

@@ -35,7 +35,6 @@ deflate,deflate_fast,False,False,N/A,0,0,0
 deflate,deflate_slow,False,False,N/A,0,0,0
 deflate,deflate_rle,True,True,43,190,83,107
 deflate,deflate_huff,True,False,N/A,0,0,0
-deflate,24,15,11,41.0,107.41666666666667
 gzclose,gzclose,True,True,76,13,10,3
 gzlib,gz_reset,True,True,88,17,15,2
 gzlib,if,True,True,60,158,95,63
