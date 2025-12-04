@@ -78,8 +78,10 @@ eg.
 make test_gzread
 ./test_gzread
 ```
+To apply the patch, run `python patch_makefile.py`. Its also in the Dockerfile already.
 
-Similar to coreutils, we create one test code per function per the .c file in /zlib.
+
+Similar to coreutils, we create one test code per function per the .c file in /zlib. The test codes are put in /tests/ and have to follow the naming of tests_{...}, like tests_{filename}_{function_name}.
 
 Problem: most functions in the source code is declared local via the ZLIB_INTERNAL attribute, making it invisible outside its compilation unit and therefore unavailable to our test harness. 
 
@@ -97,7 +99,6 @@ nm libz.a | grep gz_avail
 ```
 
 ## MUll:
-# Mull mutation testing:
 ```bash
 make clean
 export CFLAGS="-fpass-plugin=/usr/lib/mull-ir-frontend-14 -g -grecord-command-line -fprofile-instr-generate -fcoverage-mapping"
