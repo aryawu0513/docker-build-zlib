@@ -19,20 +19,20 @@ make test/example #(same as gcc -I/usr/include test/example.c -lz -o test/exampl
 ```
 
 
-## Key Facts About zlib
+## Key Facts About zlib:
+In short, we no longer do the trick of #include test.c in program.c that we do in coreutils. Instead, we just write test files and execute them.
+
+Reason:
 	•	zlib is a library, not a set of standalone programs like coreutils.
 	•	Most source files (e.g., crc32.c, deflate.c, gzwrite.c) compile into object files (.o) and are linked into libz.a or libz.so.
-	•	These source files do not contain a main() function, so they cannot be executed directly.
-	•	The only executables provided are small examples such as example, minigzip, etc.
-
-Implication: To test or use zlib like we do with coreutils, we need to:
-	1.	Write our own test programs or example programs that include zlib headers and call its functions.
-	2.	Compile these programs while linking against the zlib library (libz.a or libz.so).
+	•	These source files do not contain a main() function, and are not designed to be executed directly.
+	•	zlib shows how to execute them through having example files. eg. /test/example.c
 
 Essentially, zlib’s workflow requires creating a user program that consumes the library, rather than running the library files directly.
+Therefore, to test or use zlib like we do with coreutils, we need to write our own test programs like the /test/example.c programs that include zlib headers and call its functions, and write makefile rules for them.
 
 
-Why example.c Can Call Many Functions
+How /test/example.c works:
     Even though example.c does not include source files like gzwrite.c directly, it can call functions such as gzputc() because:
 	1.	Header inclusion: example.c includes zlib.h: 
         #include "zlib.h"
@@ -50,19 +50,21 @@ Why example.c Can Call Many Functions
         The linker resolves function calls like gzputc() from libz.a.
 
 
-## Creating Unity Test Harnesses for zlib: modification in Makefile
+## Create executable test files for zlib: modification in Makefile and adding global function defs
 
 To test individual zlib modules using the Unity testing framework:
 	1.	Create a test file for each module you want to test (e.g., test/test_gzread.c).
 	2.	Add Makefile rules to build and link the test program with zlib and Unity:
 
-Pattern rule for test harnesses
+```bash
+#Pattern rule for test harnesses
 tests_%: tests_%.o $(STATICLIB) unity/unity.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(STATICLIB) unity/unity.o
 
-Build the object for a test harness in test/
+#Build the object for a test harness in test/
 tests_%.o: $(SRCDIR)test/tests_%.c $(SRCDIR)zlib.h zconf.h
 	$(CC) $(CFLAGS) $(ZINCOUT) -c -o $@ $<
+```
 
 Notes:
 	•	$< refers to the .o file of the test source.
@@ -72,15 +74,14 @@ Notes:
 This approach lets us create multiple test_xxx programs that behave like example.c
 
 eg.
+```bash
 make test_gzread
 ./test_gzread
+```
 
-## We do it for all the .c file in /zlib.
-None of them have a main() function.
-Not the ones in /examples. those are programs that demonstrate how to use zlib. (these are the ones that have a main function)
+Similar to coreutils, we create one test code per function per the .c file in /zlib.
 
-We do it per function.
-But problem: most functions in the source code is declared local via the ZLIB_INTERNAL attribute, making it invisible outside its compilation unit and therefore unavailable to our test harness. 
+Problem: most functions in the source code is declared local via the ZLIB_INTERNAL attribute, making it invisible outside its compilation unit and therefore unavailable to our test harness. 
 
 To address this, we created a global wrapper function. see `data_pipelie/test_addglobalwrapper.py`
 
