@@ -1,0 +1,10 @@
+mutators:
+  - cxx_all
+
+timeout: 10000
+
+includePaths:
+  - '^/zlib/[^/]+\.c$'
+
+excludePaths:
+  - '^/zlib/tests/.*$'
