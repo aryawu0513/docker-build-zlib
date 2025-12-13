@@ -181,11 +181,26 @@ def avg(values):
 
 
 
-def run_mull(program_name, function_name, test_filename):
+def run_mull(program_name, function_name, test_filename, HOST_ZLIB_PATH):
     """Run Mull mutation testing and save output to file."""
     reports_dir = "mull-reports"
     mkdir_cmd = f"mkdir -p {reports_dir}"
     run_in_container(mkdir_cmd, show_output=False)
+
+
+    # Replace mull.yml
+    mull_yml_content = f"""
+mutators:
+  - cxx_all
+
+timeout: 10000
+
+includePaths:
+  - ".*/zlib/{program_name}.c$"
+   """
+    mull_yml_path = os.path.join(HOST_ZLIB_PATH, f"mull.yml")
+    write_host_file(mull_yml_path, mull_yml_content)
+    
     
     # Save output to mull-reports directory
     output_file = f"{reports_dir}/mull_{program_name}_{function_name}.out"
@@ -451,7 +466,7 @@ def inject_and_test(program_name, HOST_ZLIB_PATH, INJECTABLE_FUNCTION_PATH, run_
             # run Mull if enabled and tests passed
             if passed and run_mutation_testing:
                 print(f"  Function {function_name} passed tests. Running mutation testing...")
-                mull_score, mull_killed, mull_survived, mull_total, mull_output_file = run_mull(program_name, function_name, test_filename)
+                mull_score, mull_killed, mull_survived, mull_total, mull_output_file = run_mull(program_name, function_name, test_filename, HOST_ZLIB_PATH)
                 result_entry.update({
                     "mull_score": mull_score if mull_score != "N/A" else None,
                     "mull_total": mull_total,

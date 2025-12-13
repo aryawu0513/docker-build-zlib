@@ -7,10 +7,10 @@ podman run -it --rm -v $PWD/zlib:/zlib build-zlib /bin/bash
 ```
 Verify that the build works:
 ```bash
-make
+make -j10
 ls /usr/lib/x86_64-linux-gnu/libz.so*
 ls /usr/include/zlib.h
-ls /unity
+ls unity
 ```
 Compile and run one of the provided example programs that include a main function:
 ```bash
@@ -111,3 +111,8 @@ make tests_gzread_gzclose_r
 ./tests_gzread_gzclose_r
 mull-runner-14 tests_gzread_gzclose_r --debug >> mull_gzclose.out 2>&1
 ```
+
+make obj/test/tests_my_unity \
+    CXX=clang++-14 \
+    AR=llvm-ar-14 \
+    CXXFLAGS="-O0 -fpass-plugin=/usr/lib/mull-ir-frontend-14 -g -grecord-command-line -fprofile-instr-generate -fcoverage-mapping"
